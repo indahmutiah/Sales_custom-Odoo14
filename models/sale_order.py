@@ -1,4 +1,7 @@
 from odoo import models, api, fields,exceptions
+from datetime import datetime
+
+
 
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
@@ -49,24 +52,12 @@ class SaleOrder(models.Model):
                     raise exceptions.ValidationError("No Kontrak sudah pernah diinputkan sebelumnya!")
                 else:
                     order.state = 'sale'
-            
+                    for delivery_order in order.picking_ids:
+                        delivery_order.move_ids_without_package.write({'qty_done': delivery_order.move_ids_without_package.product_uom_qty})
+                        delivery_order.button_validate()
+                    invoices = order._create_invoices()
+                    invoices.action_post()
 
-            # Modifikasi proses pengiriman (delivery)
-            delivery_orders = self.env['stock.picking'].search([('origin', '=', order.name)])
-            for delivery_order in delivery_orders:
-                delivery_order.action_done()
-
-
-            # Membuat invoice dengan status "Paid"
-            invoice = order._create_invoices()
-            if invoice:
-                invoice.action_post()
-
-            # Setelah semua pengiriman selesai dan faktur dibuat, lanjutkan dengan mengonfirmasi pesanan penjualan
-            super(SaleOrder, order).action_confirm()
+        super(SaleOrder, self).action_confirm()
 
         return True
-    
-        
-    
-    
